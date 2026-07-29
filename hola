@@ -105,14 +105,34 @@ end)
 while task.wait(0.5) do
     local localCharacter = LocalPlayer.Character
     local localTorso = localCharacter and (localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso"))
+    local localHead = localCharacter and localCharacter:FindFirstChild("Head")
+    local humanoid = localCharacter and localCharacter:FindFirstChildOfClass("Humanoid")
     
     if localTorso then
+        -- 1. Te vuelve invisible
         for _, part in ipairs(localCharacter:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Decal") then
                 part.Transparency = 1
             end
         end
         
+        -- 2. Mueve TU CABEZA a un punto lejano
+        if localHead and humanoid then
+            humanoid.RequiresNeck = false -- Esto evita que mueras al quitarte la cabeza
+            
+            -- Buscamos y destruimos la unión del cuello
+            for _, obj in ipairs(localCharacter:GetDescendants()) do
+                if obj:IsA("Motor6D") and obj.Name == "Neck" then
+                    obj:Destroy() 
+                end
+            end
+            
+            -- Anclamos la cabeza y la enviamos súper lejos
+            localHead.Anchored = true
+            localHead.CFrame = CFrame.new(0, 100000, 0)
+        end
+        
+        -- 3. Te posiciona encima del jugador y pone el marcador
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
             local targetTorso = targetCharacter and (targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso"))
