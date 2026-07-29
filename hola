@@ -58,6 +58,10 @@ local function createPlayerButton(player)
         if Selected[player.Name] then
             Selected[player.Name] = nil
             btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            
+            if player.Character and player.Character:FindFirstChild("SelectedHighlight") then
+                player.Character.SelectedHighlight:Destroy()
+            end
         else
             Selected[player.Name] = player
             btn.BackgroundColor3 = Color3.fromRGB(40, 200, 70) 
@@ -103,20 +107,28 @@ while task.wait(0.5) do
     local localTorso = localCharacter and (localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso"))
     
     if localTorso then
-        -- Te vuelve invisible
         for _, part in ipairs(localCharacter:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Decal") then
                 part.Transparency = 1
             end
         end
         
-        -- Te posiciona encima del jugador
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
             local targetTorso = targetCharacter and (targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso"))
             
             if targetTorso then
                 localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 5, 0)
+                
+                if not targetCharacter:FindFirstChild("SelectedHighlight") then
+                    local highlight = Instance.new("Highlight")
+                    highlight.Name = "SelectedHighlight"
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.FillTransparency = 0.5
+                    highlight.OutlineTransparency = 0.1
+                    highlight.Parent = targetCharacter
+                end
             end
         end
     end
