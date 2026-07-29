@@ -5,7 +5,6 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
 
 local Selected = {}
-local originalPosition = nil -- Guardará tu posición secreta
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PlayerSelectorGui"
@@ -88,8 +87,7 @@ Players.PlayerRemoving:Connect(function(plr)
     end
 end)
 
--- Movemos la cámara estilo Dron
-RunService:BindToRenderStep("CameraSpectate", Enum.RenderPriority.Camera.Value + 1, function()
+RunService:BindToRenderStep("CameraLockToHead", Enum.RenderPriority.Camera.Value + 1, function()
     local targetHead = nil
     for _, targetPlayer in pairs(Selected) do
         local targetCharacter = targetPlayer.Character
@@ -100,27 +98,28 @@ RunService:BindToRenderStep("CameraSpectate", Enum.RenderPriority.Camera.Value +
     end
 
     if targetHead then
-        -- Mueve tu cámara justo detrás y un poco arriba de la cabeza del objetivo
-        Camera.CFrame = CFrame.lookAt(targetHead.Position + Vector3.new(0, 3, 7), targetHead.Position)
+        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
     end
 end)
 
--- Bucle principal para esconderte y marcar
 while task.wait(0.5) do
     local localCharacter = LocalPlayer.Character
     local localTorso = localCharacter and (localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso"))
     
     if localTorso then
-        local isFollowing = false
+        for _, part in ipairs(localCharacter:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = 1
+            end
+        end
         
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
             local targetTorso = targetCharacter and (targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso"))
             
             if targetTorso then
-                isFollowing = true
+                localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 5, 0)
                 
-                -- Aplicar Highlight
                 if not targetCharacter:FindFirstChild("SelectedHighlight") then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = "SelectedHighlight"
@@ -130,26 +129,6 @@ while task.wait(0.5) do
                     highlight.OutlineTransparency = 0.1
                     highlight.Parent = targetCharacter
                 end
-                break -- Solo nos enfocamos en uno a la vez para evitar bugs
-            end
-        end
-        
-        if isFollowing then
-            -- 1. Si apenas vas a seguirlo, guardamos tu posición actual
-            if not originalPosition then
-                originalPosition = localTorso.CFrame
-            end
-            
-            -- 2. Te mandamos 50,000 studs hacia arriba al cielo y te anclamos
-            localTorso.CFrame = CFrame.new(0, 50000, 0)
-            localTorso.Anchored = true
-            
-        else
-            -- 3. Si desmarcas a todos, te regresamos a donde estabas
-            if originalPosition then
-                localTorso.Anchored = false
-                localTorso.CFrame = originalPosition
-                originalPosition = nil
             end
         end
     end
