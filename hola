@@ -98,26 +98,26 @@ RunService:BindToRenderStep("CameraLockToHead", Enum.RenderPriority.Camera.Value
     end
 end)
 
-RunService.Heartbeat:Connect(function()
+while task.wait(0.5) do
     local localCharacter = LocalPlayer.Character
-    local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+    local localTorso = localCharacter and (localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso"))
     
-    if localRoot then
+    if localTorso then
+        -- Te vuelve invisible
+        for _, part in ipairs(localCharacter:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = 1
+            end
+        end
+        
+        -- Te posiciona encima del jugador
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
             local targetTorso = targetCharacter and (targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso"))
             
             if targetTorso then
-                for _, part in ipairs(localCharacter:GetDescendants()) do
-                    if part:IsA("BasePart") or part:IsA("Decal") then
-                        part.Transparency = 1
-                    end
-                end
-                
-                -- Te coloca justo detrás del jugador, en lugar de flotando arriba
-                localRoot.CFrame = targetTorso.CFrame * CFrame.new(0, 0, 1)
-                break
+                localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 5, 0)
             end
         end
     end
-end)
+end
