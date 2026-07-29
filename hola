@@ -103,26 +103,21 @@ RunService.Heartbeat:Connect(function()
     local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
     
     if localRoot then
-        local isFollowing = false
-        
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
             local targetTorso = targetCharacter and (targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso"))
             
             if targetTorso then
-                isFollowing = true
-                
                 for _, part in ipairs(localCharacter:GetDescendants()) do
                     if part:IsA("BasePart") or part:IsA("Decal") then
                         part.Transparency = 1
                     end
                 end
                 
-                localRoot.CFrame = targetTorso.CFrame * CFrame.new(0, 6, 0)
+                -- Te coloca justo detrás del jugador, en lugar de flotando arriba
+                localRoot.CFrame = targetTorso.CFrame * CFrame.new(0, 0, 3)
                 break
             end
         end
-        
-        localRoot.Anchored = isFollowing
     end
 end)
