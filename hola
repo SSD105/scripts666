@@ -150,7 +150,7 @@ RunService.Heartbeat:Connect(function()
                 isAttached = true
                 
                 -- 1. Calculamos la posición donde vas a flotar (8 arriba, 3 atrás)
-                local hoverPos = (targetRoot.CFrame * CFrame.new(0, 8, 3)).Position
+                local hoverPos = (targetRoot.CFrame * CFrame.new(0, 20, 3)).Position
                 
                 -- 2. Teletransportamos tu cuerpo ahí, y forzamos la rotación para mirar a su cabeza
                 localRoot.CFrame = CFrame.lookAt(hoverPos, targetHead.Position)
