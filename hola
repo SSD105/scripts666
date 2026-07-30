@@ -42,7 +42,6 @@ UIPadding.PaddingTop = UDim.new(0, 5)
 UIPadding.PaddingBottom = UDim.new(0, 5)
 UIPadding.Parent = Frame
 
--- Ocultar/Mostrar UI con Control Derecho
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
         Frame.Visible = not Frame.Visible
@@ -116,13 +115,12 @@ RunService:BindToRenderStep("LethalAimbot", 201, function()
     end
 
     if targetHead then
-        -- Mantiene tu mira clavada en su cabeza sin importar cómo se mueva tu cuerpo
         Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
     end
 end)
 
 -- ==========================================
--- 3. MOTOR FÍSICO Y ESP BLINDADO (MODO CABEZA)
+-- 3. MOTOR FÍSICO Y ESP BLINDADO
 -- ==========================================
 RunService.Heartbeat:Connect(function()
     local localCharacter = LocalPlayer.Character
@@ -131,7 +129,6 @@ RunService.Heartbeat:Connect(function()
     if localRoot then
         local isAttached = false
         
-        -- Modo Fantasma
         for _, part in ipairs(localCharacter:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Decal") then
                 part.Transparency = 1
@@ -142,20 +139,20 @@ RunService.Heartbeat:Connect(function()
             end
         end
         
-        -- Sincronización absoluta con la cabeza del enemigo
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
-            -- Buscamos específicamente la Cabeza, ya no el RootPart
+            local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
             local targetHead = targetCharacter and targetCharacter:FindFirstChild("Head")
             
-            if targetHead then
+            if targetRoot and targetHead then
                 isAttached = true
                 
-                -- Al multiplicarlo por el CFrame de la cabeza, copias su rotación exacta.
-                -- Estarás 8 studs arriba y 3 atrás de donde sea que su cabeza esté apuntando.
-                localRoot.CFrame = targetHead.CFrame * CFrame.new(0, 8, 3)
+                -- Extraemos la posición estable del RootPart (arriba y atrás)
+                local offsetPosition = (targetRoot.CFrame * CFrame.new(0, 8, 3)).Position
                 
-                -- Wallhack
+                -- Combinamos nuestra posición estable con la rotación exacta de su cabeza
+                localRoot.CFrame = CFrame.new(offsetPosition) * targetHead.CFrame.Rotation
+                
                 if not targetCharacter:FindFirstChild("KillHighlight") then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = "KillHighlight"
@@ -169,7 +166,6 @@ RunService.Heartbeat:Connect(function()
             end
         end
         
-        -- Anclaje para evitar temblores físicos
         localRoot.Anchored = isAttached
     end
 end)
