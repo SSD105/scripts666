@@ -42,6 +42,7 @@ UIPadding.PaddingTop = UDim.new(0, 5)
 UIPadding.PaddingBottom = UDim.new(0, 5)
 UIPadding.Parent = Frame
 
+-- Ocultar/Mostrar UI con Control Derecho
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
         Frame.Visible = not Frame.Visible
@@ -104,7 +105,6 @@ end)
 -- ==========================================
 -- 2. AIMBOT (BLOQUEO DE CÁMARA AGRESIVO)
 -- ==========================================
--- Usamos prioridad 201 para sobreescribir el movimiento de cámara estándar de Roblox
 RunService:BindToRenderStep("LethalAimbot", 201, function()
     local targetHead = nil
     for _, targetPlayer in pairs(Selected) do
@@ -116,13 +116,13 @@ RunService:BindToRenderStep("LethalAimbot", 201, function()
     end
 
     if targetHead then
-        -- Fuerza la cámara a mirar directamente al centro de la cabeza en el frame exacto
+        -- Mantiene tu mira clavada en su cabeza sin importar cómo se mueva tu cuerpo
         Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
     end
 end)
 
 -- ==========================================
--- 3. MOTOR FÍSICO Y ESP BLINDADO
+-- 3. MOTOR FÍSICO Y ESP BLINDADO (MODO CABEZA)
 -- ==========================================
 RunService.Heartbeat:Connect(function()
     local localCharacter = LocalPlayer.Character
@@ -131,6 +131,7 @@ RunService.Heartbeat:Connect(function()
     if localRoot then
         local isAttached = false
         
+        -- Modo Fantasma
         for _, part in ipairs(localCharacter:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Decal") then
                 part.Transparency = 1
@@ -141,16 +142,20 @@ RunService.Heartbeat:Connect(function()
             end
         end
         
+        -- Sincronización absoluta con la cabeza del enemigo
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
-            local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
+            -- Buscamos específicamente la Cabeza, ya no el RootPart
+            local targetHead = targetCharacter and targetCharacter:FindFirstChild("Head")
             
-            if targetRoot then
+            if targetHead then
                 isAttached = true
                 
-                -- Y: 8 studs arriba | Z: 3 studs atrás. (Arregla el Gimbal Lock)
-                localRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 8, 3)
+                -- Al multiplicarlo por el CFrame de la cabeza, copias su rotación exacta.
+                -- Estarás 8 studs arriba y 3 atrás de donde sea que su cabeza esté apuntando.
+                localRoot.CFrame = targetHead.CFrame * CFrame.new(0, 8, 3)
                 
+                -- Wallhack
                 if not targetCharacter:FindFirstChild("KillHighlight") then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = "KillHighlight"
@@ -164,6 +169,7 @@ RunService.Heartbeat:Connect(function()
             end
         end
         
+        -- Anclaje para evitar temblores físicos
         localRoot.Anchored = isAttached
     end
 end)
