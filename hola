@@ -6,6 +6,9 @@ local Camera = workspace.CurrentCamera
 
 local Selected = {}
 
+-- ==========================================
+-- 1. INTERFAZ GRÁFICA (UI)
+-- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PlayerSelectorGui"
 ScreenGui.ResetOnSpawn = false
@@ -56,15 +59,17 @@ local function createPlayerButton(player)
 
     btn.MouseButton1Click:Connect(function()
         if Selected[player.Name] then
+            -- Deseleccionar
             Selected[player.Name] = nil
             btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
             
-            if player.Character and player.Character:FindFirstChild("SelectedHighlight") then
-                player.Character.SelectedHighlight:Destroy()
+            if player.Character and player.Character:FindFirstChild("KillHighlight") then
+                player.Character.KillHighlight:Destroy()
             end
         else
+            -- Seleccionar
             Selected[player.Name] = player
-            btn.BackgroundColor3 = Color3.fromRGB(40, 200, 70) 
+            btn.BackgroundColor3 = Color3.fromRGB(180, 20, 20) -- Rojo agresivo
         end
     end)
 end
@@ -75,19 +80,17 @@ for _, plr in pairs(Players:GetPlayers()) do
     end
 end
 
-Players.PlayerAdded:Connect(function(plr)
-    createPlayerButton(plr)
-end)
+Players.PlayerAdded:Connect(createPlayerButton)
 
 Players.PlayerRemoving:Connect(function(plr)
     Selected[plr.Name] = nil 
     local button = Frame:FindFirstChild(plr.Name)
-    if button then
-        button:Destroy()
-    end
+    if button then button:Destroy() end
 end)
 
--- Mantiene tu cámara bloqueada en la cabeza del objetivo
+-- ==========================================
+-- 2. BLOQUEO DE CÁMARA (AIMBOT BÁSICO)
+-- ==========================================
 RunService:BindToRenderStep("CameraLockToHead", Enum.RenderPriority.Camera.Value + 1, function()
     local targetHead = nil
     for _, targetPlayer in pairs(Selected) do
@@ -103,13 +106,15 @@ RunService:BindToRenderStep("CameraLockToHead", Enum.RenderPriority.Camera.Value
     end
 end)
 
--- Bucle principal para movimiento, invisibilidad y físicas "fantasma"
-while task.wait(0.1) do
+-- ==========================================
+-- 3. MOTOR FÍSICO Y ESP (HEARTBEAT)
+-- ==========================================
+RunService.Heartbeat:Connect(function()
     local localCharacter = LocalPlayer.Character
     local localTorso = localCharacter and (localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso"))
     
     if localTorso then
-        -- Te vuelve un fantasma (invisible, sin colisiones, sin masa)
+        -- 3.1 MODO FANTASMA CONTINUO
         for _, part in ipairs(localCharacter:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Decal") then
                 part.Transparency = 1
@@ -120,26 +125,27 @@ while task.wait(0.1) do
             end
         end
         
-        -- Te posiciona encima del jugador y aplica el Highlight
+        -- 3.2 SEGUIMIENTO FLUIDO Y WALLHACK
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
             local targetTorso = targetCharacter and (targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso"))
             
             if targetTorso then
-                -- 5 studs encima de su torso
-                localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 20, 0)
+                -- Movimiento sin lag atado al frame rate
+                localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 8, 0)
                 
-                -- Añade el marcador rojo si no lo tiene
-                if not targetCharacter:FindFirstChild("SelectedHighlight") then
+                -- Wallhack (ESP) a través de las paredes
+                if not targetCharacter:FindFirstChild("KillHighlight") then
                     local highlight = Instance.new("Highlight")
-                    highlight.Name = "SelectedHighlight"
+                    highlight.Name = "KillHighlight"
                     highlight.FillColor = Color3.fromRGB(255, 0, 0)
                     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
                     highlight.FillTransparency = 0.5
                     highlight.OutlineTransparency = 0.1
+                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Magia pura
                     highlight.Parent = targetCharacter
                 end
             end
         end
     end
-end
+end)
