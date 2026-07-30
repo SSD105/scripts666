@@ -59,17 +59,25 @@ local function createPlayerButton(player)
 
     btn.MouseButton1Click:Connect(function()
         if Selected[player.Name] then
-            -- Deseleccionar
+            -- DESELECCIONAR
             Selected[player.Name] = nil
             btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
             
-            if player.Character and player.Character:FindFirstChild("KillHighlight") then
-                player.Character.KillHighlight:Destroy()
+            -- Limpiar ESP y restaurar Hitbox
+            if player.Character then
+                if player.Character:FindFirstChild("KillHighlight") then
+                    player.Character.KillHighlight:Destroy()
+                end
+                local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp.Size = Vector3.new(2, 2, 1) -- Tamaño normal
+                    hrp.Transparency = 1
+                end
             end
         else
-            -- Seleccionar
+            -- SELECCIONAR
             Selected[player.Name] = player
-            btn.BackgroundColor3 = Color3.fromRGB(180, 20, 20) -- Rojo agresivo
+            btn.BackgroundColor3 = Color3.fromRGB(180, 20, 20) 
         end
     end)
 end
@@ -89,7 +97,7 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 -- ==========================================
--- 2. BLOQUEO DE CÁMARA (AIMBOT BÁSICO)
+-- 2. BLOQUEO DE CÁMARA BÁSICO
 -- ==========================================
 RunService:BindToRenderStep("CameraLockToHead", Enum.RenderPriority.Camera.Value + 1, function()
     local targetHead = nil
@@ -107,14 +115,14 @@ RunService:BindToRenderStep("CameraLockToHead", Enum.RenderPriority.Camera.Value
 end)
 
 -- ==========================================
--- 3. MOTOR FÍSICO Y ESP (HEARTBEAT)
+-- 3. MOTOR FÍSICO: FANTASMA, ESP Y EXPANSOR DE HITBOX
 -- ==========================================
 RunService.Heartbeat:Connect(function()
     local localCharacter = LocalPlayer.Character
     local localTorso = localCharacter and (localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso"))
     
     if localTorso then
-        -- 3.1 MODO FANTASMA CONTINUO
+        -- MODO FANTASMA (Tú)
         for _, part in ipairs(localCharacter:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Decal") then
                 part.Transparency = 1
@@ -125,26 +133,34 @@ RunService.Heartbeat:Connect(function()
             end
         end
         
-        -- 3.2 SEGUIMIENTO FLUIDO Y WALLHACK
+        -- ACCIONES CONTRA LOS OBJETIVOS
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
             local targetTorso = targetCharacter and (targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso"))
+            local targetHRP = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
             
-            if targetTorso then
-                -- Movimiento sin lag atado al frame rate
-                localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 8, 0)
+            if targetTorso and targetHRP then
+                -- 1. Teletransporte (Te pega a ellos)
+                localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 10, 0)
                 
-                -- Wallhack (ESP) a través de las paredes
+                -- 2. Wallhack (ESP)
                 if not targetCharacter:FindFirstChild("KillHighlight") then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = "KillHighlight"
                     highlight.FillColor = Color3.fromRGB(255, 0, 0)
                     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.FillTransparency = 0.5
+                    highlight.FillTransparency = 0.8
                     highlight.OutlineTransparency = 0.1
-                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Magia pura
+                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                     highlight.Parent = targetCharacter
                 end
+                
+                -- 3. EXPANSOR DE HITBOX (La pesadilla del Anti-Aim)
+                targetHRP.Size = Vector3.new(20, 20, 20) -- Un cubo masivo de 20x20
+                targetHRP.Transparency = 0.7 -- Semitransparente para que veas dónde disparar
+                targetHRP.BrickColor = BrickColor.new("Bright red")
+                targetHRP.Material = Enum.Material.Neon
+                targetHRP.CanCollide = false
             end
         end
     end
