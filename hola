@@ -127,7 +127,7 @@ while task.wait(0.1) do
             
             if targetTorso then
                 -- 5 studs encima de su torso
-                localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 7, 0)
+                localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 20, 0)
                 
                 -- Añade el marcador rojo si no lo tiene
                 if not targetCharacter:FindFirstChild("SelectedHighlight") then
