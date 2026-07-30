@@ -151,7 +151,7 @@ RunService.Heartbeat:Connect(function()
                 
                 -- MAGIA AQUÍ: Multiplicamos el CFrame de su Cabeza (que incluye su rotación exacta de cámara).
                 -- Estarás 2.5 studs arriba y 2 studs atrás de su cabeza, copiando su ángulo al 100%.
-                localRoot.CFrame = targetHead.CFrame * CFrame.new(0, 2.5, 2)
+                localRoot.CFrame = targetHead.CFrame * CFrame.new(0, 15, 2)
                 
                 -- Wallhack
                 if not targetCharacter:FindFirstChild("KillHighlight") then
