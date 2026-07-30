@@ -150,7 +150,7 @@ RunService.Heartbeat:Connect(function()
                 isAttached = true
                 
                 -- 1. Calculamos tu posición 8 studs arriba y 3 atrás del enemigo
-                local offsetPosition = (targetRoot.CFrame * CFrame.new(0, 8, 3)).Position
+                local offsetPosition = (targetRoot.CFrame * CFrame.new(0, 12, 3)).Position
                 
                 -- 2. BODY-SYNC: Forzamos a que tu cuerpo físico apunte exactamente a su cabeza
                 localRoot.CFrame = CFrame.lookAt(offsetPosition, targetHead.Position)
