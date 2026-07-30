@@ -42,6 +42,7 @@ UIPadding.PaddingTop = UDim.new(0, 5)
 UIPadding.PaddingBottom = UDim.new(0, 5)
 UIPadding.Parent = Frame
 
+-- Ocultar/Mostrar UI con Control Derecho
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
         Frame.Visible = not Frame.Visible
@@ -102,7 +103,7 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 -- ==========================================
--- 2. AIMBOT (BLOQUEO DE CÁMARA AGRESIVO)
+-- 2. AIMBOT (CÁMARA LETHAL)
 -- ==========================================
 RunService:BindToRenderStep("LethalAimbot", 201, function()
     local targetHead = nil
@@ -120,7 +121,7 @@ RunService:BindToRenderStep("LethalAimbot", 201, function()
 end)
 
 -- ==========================================
--- 3. MOTOR FÍSICO Y ESP BLINDADO
+-- 3. MOTOR FÍSICO Y ESP (BODY-SYNC)
 -- ==========================================
 RunService.Heartbeat:Connect(function()
     local localCharacter = LocalPlayer.Character
@@ -129,6 +130,7 @@ RunService.Heartbeat:Connect(function()
     if localRoot then
         local isAttached = false
         
+        -- MODO FANTASMA
         for _, part in ipairs(localCharacter:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Decal") then
                 part.Transparency = 1
@@ -147,12 +149,13 @@ RunService.Heartbeat:Connect(function()
             if targetRoot and targetHead then
                 isAttached = true
                 
-                -- Extraemos la posición estable del RootPart (arriba y atrás)
+                -- 1. Calculamos tu posición 8 studs arriba y 3 atrás del enemigo
                 local offsetPosition = (targetRoot.CFrame * CFrame.new(0, 8, 3)).Position
                 
-                -- Combinamos nuestra posición estable con la rotación exacta de su cabeza
-                localRoot.CFrame = CFrame.new(offsetPosition) * targetHead.CFrame.Rotation
+                -- 2. BODY-SYNC: Forzamos a que tu cuerpo físico apunte exactamente a su cabeza
+                localRoot.CFrame = CFrame.lookAt(offsetPosition, targetHead.Position)
                 
+                -- WALLHACK ESP
                 if not targetCharacter:FindFirstChild("KillHighlight") then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = "KillHighlight"
