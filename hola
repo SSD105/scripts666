@@ -1,44 +1,31 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
 
--- Variables tácticas
-local activeTarget = nil
-local originalCFrame = nil -- Guarda tu escondite
+local Selected = {}
 
 -- ==========================================
--- 1. INTERFAZ GRÁFICA (UI) - AHORA CON BOTÓN DE OCULTAR
+-- 1. INTERFAZ GRÁFICA (UI)
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PlayerSelectorGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
--- Botón para ocultar/mostrar el menú
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0, 100, 0, 30)
-ToggleBtn.Position = UDim2.new(0, 50, 0, 60)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(150, 20, 20)
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.Text = "Ocultar Radar"
-ToggleBtn.Parent = ScreenGui
-
-local UICornerToggle = Instance.new("UICorner")
-UICornerToggle.CornerRadius = UDim.new(0, 6)
-UICornerToggle.Parent = ToggleBtn
-
 local Frame = Instance.new("ScrollingFrame")
 Frame.Size = UDim2.new(0, 200, 0, 300)
 Frame.Position = UDim2.new(0, 50, 0, 100)
-Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25) -- Más oscuro, menos intrusivo
 Frame.BorderSizePixel = 0
-Frame.ScrollBarImageColor3 = Color3.fromRGB(200, 200, 200)
+Frame.ScrollBarImageColor3 = Color3.fromRGB(150, 150, 150)
 Frame.AutomaticCanvasSize = Enum.AutomaticSize.Y 
 Frame.CanvasSize = UDim2.new(0, 0, 0, 0)
 Frame.Parent = ScreenGui
+Frame.Active = true
+Frame.Draggable = true -- ¡Ahora puedes arrastrar el menú por la pantalla!
 
 local UICornerFrame = Instance.new("UICorner")
 UICornerFrame.CornerRadius = UDim.new(0, 8)
@@ -55,25 +42,13 @@ UIPadding.PaddingTop = UDim.new(0, 5)
 UIPadding.PaddingBottom = UDim.new(0, 5)
 UIPadding.Parent = Frame
 
--- Lógica del botón de ocultar
-local isMenuVisible = true
-ToggleBtn.MouseButton1Click:Connect(function()
-    isMenuVisible = not isMenuVisible
-    Frame.Visible = isMenuVisible
-    ToggleBtn.Text = isMenuVisible and "Ocultar Radar" or "Mostrar Radar"
-    ToggleBtn.BackgroundColor3 = isMenuVisible and Color3.fromRGB(150, 20, 20) or Color3.fromRGB(20, 150, 20)
+-- Ocultar/Mostrar UI con Control Derecho
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
+        Frame.Visible = not Frame.Visible
+    end
 end)
 
--- Limpiar el Highlight visual de un jugador
-local function clearHighlight(character)
-    if character and character:FindFirstChild("KillHighlight") then
-        character.KillHighlight:Destroy()
-    end
-end
-
--- ==========================================
--- 2. LÓGICA DE BOTONES (OBJETIVO ÚNICO Y RECALL)
--- ==========================================
 local function createPlayerButton(player)
     if Frame:FindFirstChild(player.Name) then return end 
 
@@ -81,9 +56,9 @@ local function createPlayerButton(player)
     btn.Name = player.Name
     btn.Size = UDim2.new(1, -10, 0, 35)
     btn.Text = player.Name
-    btn.Font = Enum.Font.GothamSemibold
+    btn.Font = Enum.Font.GothamBold
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     btn.AutoButtonColor = true
     
     local UICornerBtn = Instance.new("UICorner")
@@ -93,119 +68,108 @@ local function createPlayerButton(player)
     btn.Parent = Frame
 
     btn.MouseButton1Click:Connect(function()
-        local localChar = LocalPlayer.Character
-        local localRoot = localChar and (localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso"))
-
-        if activeTarget == player then
-            -- DESELECCIONAR: Regresar a la normalidad
-            activeTarget = nil
-            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-            clearHighlight(player.Character)
+        if Selected[player.Name] then
+            -- Deseleccionar
+            Selected[player.Name] = nil
+            btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
             
-            -- Sistema de Retorno: Vuelve a donde estabas
-            if originalCFrame and localRoot then
-                localRoot.CFrame = originalCFrame
-                originalCFrame = nil -- Limpiar memoria
+            if player.Character and player.Character:FindFirstChild("KillHighlight") then
+                player.Character.KillHighlight:Destroy()
             end
         else
-            -- SELECCIONAR NUEVO OBJETIVO
-            -- 1. Limpiar al objetivo anterior si lo había
-            if activeTarget then
-                local oldBtn = Frame:FindFirstChild(activeTarget.Name)
-                if oldBtn then oldBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) end
-                clearHighlight(activeTarget.Character)
+            -- Limpiar selección anterior (solo permite 1 objetivo a la vez para evitar bugs de cámara)
+            for k, v in pairs(Selected) do
+                Selected[k] = nil
+                local oldBtn = Frame:FindFirstChild(k)
+                if oldBtn then oldBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45) end
             end
             
-            -- 2. Guardar tu posición original SI NO estás volando ya
-            if not originalCFrame and localRoot then
-                originalCFrame = localRoot.CFrame
-            end
-
-            -- 3. Fijar el nuevo objetivo
-            activeTarget = player
+            -- Seleccionar nuevo objetivo
+            Selected[player.Name] = player
             btn.BackgroundColor3 = Color3.fromRGB(180, 20, 20)
         end
     end)
 end
 
 for _, plr in pairs(Players:GetPlayers()) do
-    if plr ~= LocalPlayer then createPlayerButton(plr) end
+    if plr ~= LocalPlayer then
+        createPlayerButton(plr)
+    end
 end
 
 Players.PlayerAdded:Connect(createPlayerButton)
 
 Players.PlayerRemoving:Connect(function(plr)
-    if activeTarget == plr then activeTarget = nil end
+    Selected[plr.Name] = nil 
     local button = Frame:FindFirstChild(plr.Name)
     if button then button:Destroy() end
 end)
 
 -- ==========================================
--- 3. BLOQUEO DE CÁMARA (SMOOTH AIM)
+-- 2. AIMBOT (BLOQUEO DE CÁMARA)
 -- ==========================================
-RunService:BindToRenderStep("CameraLockToHead", Enum.RenderPriority.Camera.Value + 1, function()
-    if activeTarget and activeTarget.Character then
-        local targetHead = activeTarget.Character:FindFirstChild("Head")
-        if targetHead then
-            -- Usamos Lerp (0.3) para que el movimiento sea un seguimiento fluido, no un salto robótico
-            local goalCFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
-            Camera.CFrame = Camera.CFrame:Lerp(goalCFrame, 0.3)
+RunService:BindToRenderStep("CameraLock", Enum.RenderPriority.Camera.Value + 1, function()
+    local targetHead = nil
+    for _, targetPlayer in pairs(Selected) do
+        local targetCharacter = targetPlayer.Character
+        if targetCharacter then
+            targetHead = targetCharacter:FindFirstChild("Head")
+            if targetHead then break end
         end
+    end
+
+    if targetHead then
+        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
     end
 end)
 
 -- ==========================================
--- 4. MOTOR FÍSICO Y ESP (HEARTBEAT)
+-- 3. MOTOR FÍSICO Y ESP BLINDADO
 -- ==========================================
 RunService.Heartbeat:Connect(function()
     local localCharacter = LocalPlayer.Character
-    local localTorso = localCharacter and (localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso"))
+    local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
     
-    if activeTarget and localTorso then
-        local targetCharacter = activeTarget.Character
-        local targetTorso = targetCharacter and (targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso"))
+    if localRoot then
+        local isAttached = false
         
-        if targetTorso then
-            -- MODO FANTASMA CONTINUO
-            for _, part in ipairs(localCharacter:GetDescendants()) do
-                if part:IsA("BasePart") or part:IsA("Decal") then
-                    part.Transparency = 1
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                        part.Massless = true
-                    end
-                end
-            end
-            
-            -- MOVIMIENTO PEGADIZO SOBRE EL JUGADOR
-            localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 8, 0)
-            
-            -- WALLHACK (ESP) A TRAVÉS DE LAS PAREDES
-            if not targetCharacter:FindFirstChild("KillHighlight") then
-                local highlight = Instance.new("Highlight")
-                highlight.Name = "KillHighlight"
-                highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                highlight.FillTransparency = 0.5
-                highlight.OutlineTransparency = 0.1
-                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                highlight.Parent = targetCharacter
-            end
-        end
-    else
-        -- Si no hay objetivo, restaurar la visibilidad de tu personaje
-        if localCharacter then
-            for _, part in ipairs(localCharacter:GetDescendants()) do
-                if part:IsA("BasePart") or part:IsA("Decal") then
-                    if part.Name ~= "HumanoidRootPart" then
-                        part.Transparency = 0
-                    end
-                    if part:IsA("BasePart") then
-                        part.CanCollide = true
-                        part.Massless = false
-                    end
+        -- MODO FANTASMA CONTINUO
+        for _, part in ipairs(localCharacter:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = 1
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                    part.Massless = true
                 end
             end
         end
+        
+        -- SEGUIMIENTO FLUIDO Y WALLHACK
+        for name, targetPlayer in pairs(Selected) do
+            local targetCharacter = targetPlayer.Character
+            local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
+            
+            if targetRoot then
+                isAttached = true
+                
+                -- Teletransporte exacto al RootPart, no al Torso (mucho más estable)
+                localRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 8, 0)
+                
+                -- Wallhack (ESP)
+                if not targetCharacter:FindFirstChild("KillHighlight") then
+                    local highlight = Instance.new("Highlight")
+                    highlight.Name = "KillHighlight"
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.FillTransparency = 0.5
+                    highlight.OutlineTransparency = 0.1
+                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    highlight.Parent = targetCharacter
+                end
+            end
+        end
+        
+        -- Anclaje dinámico: Si estás pegado a alguien, anula tu gravedad para evitar temblores.
+        localRoot.Anchored = isAttached
     end
 end)
