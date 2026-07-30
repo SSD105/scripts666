@@ -8,7 +8,7 @@ local Camera = workspace.CurrentCamera
 local Selected = {}
 
 -- ==========================================
--- 1. INTERFAZ GRÁFICA (UI)
+-- 1. INTERFAZ GRÁFICA TÁCTICA
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PlayerSelectorGui"
@@ -42,6 +42,7 @@ UIPadding.PaddingTop = UDim.new(0, 5)
 UIPadding.PaddingBottom = UDim.new(0, 5)
 UIPadding.Parent = Frame
 
+-- Ocultar menú con Control Derecho
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
         Frame.Visible = not Frame.Visible
@@ -102,7 +103,7 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 -- ==========================================
--- 2. AIMBOT (CÁMARA LIGADA A LA CABEZA)
+-- 2. AIMBOT (BLOQUEO DE CÁMARA)
 -- ==========================================
 RunService:BindToRenderStep("LethalAimbot", 201, function()
     local targetHead = nil
@@ -120,7 +121,7 @@ RunService:BindToRenderStep("LethalAimbot", 201, function()
 end)
 
 -- ==========================================
--- 3. MOTOR FÍSICO Y ROTACIÓN DE CUERPO
+-- 3. MOTOR FÍSICO, ESP Y SINCRONIZACIÓN DE CÁMARA
 -- ==========================================
 RunService.Heartbeat:Connect(function()
     local localCharacter = LocalPlayer.Character
@@ -129,7 +130,7 @@ RunService.Heartbeat:Connect(function()
     if localRoot then
         local isAttached = false
         
-        -- MODO FANTASMA CONTINUO
+        -- Modo fantasma extremo
         for _, part in ipairs(localCharacter:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Decal") then
                 part.Transparency = 1
@@ -140,22 +141,19 @@ RunService.Heartbeat:Connect(function()
             end
         end
         
-        -- POSICIONAMIENTO Y ROTACIÓN TÁCTICA
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
-            local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
+            -- Ahora buscamos su CABEZA, no su torso.
             local targetHead = targetCharacter and targetCharacter:FindFirstChild("Head")
             
-            if targetRoot and targetHead then
+            if targetHead then
                 isAttached = true
                 
-                -- 1. Calculamos la posición donde vas a flotar (8 arriba, 3 atrás)
-                local hoverPos = (targetRoot.CFrame * CFrame.new(0, 20, 3)).Position
+                -- MAGIA AQUÍ: Multiplicamos el CFrame de su Cabeza (que incluye su rotación exacta de cámara).
+                -- Estarás 2.5 studs arriba y 2 studs atrás de su cabeza, copiando su ángulo al 100%.
+                localRoot.CFrame = targetHead.CFrame * CFrame.new(0, 2.5, 2)
                 
-                -- 2. Teletransportamos tu cuerpo ahí, y forzamos la rotación para mirar a su cabeza
-                localRoot.CFrame = CFrame.lookAt(hoverPos, targetHead.Position)
-                
-                -- 3. ESP Wallhack
+                -- Wallhack
                 if not targetCharacter:FindFirstChild("KillHighlight") then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = "KillHighlight"
@@ -169,6 +167,7 @@ RunService.Heartbeat:Connect(function()
             end
         end
         
+        -- Anclaje para eliminar la gravedad y evitar vibraciones en tu Aimbot
         localRoot.Anchored = isAttached
     end
 end)
