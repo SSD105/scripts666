@@ -5,7 +5,6 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
 
 local Selected = {}
-local OriginalSizes = {} -- Guardaremos el tamaño original de las cabezas para cuando los deselecciones
 
 -- ==========================================
 -- 1. INTERFAZ GRÁFICA (UI)
@@ -60,34 +59,24 @@ local function createPlayerButton(player)
 
     btn.MouseButton1Click:Connect(function()
         if Selected[player.Name] then
-            -- DESELECCIONAR: Revertir todo a la normalidad
+            -- Deseleccionar y restaurar tamaño original
             Selected[player.Name] = nil
             btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
             
-            local char = player.Character
-            if char then
-                if char:FindFirstChild("KillHighlight") then
-                    char.KillHighlight:Destroy()
+            if player.Character then
+                if player.Character:FindFirstChild("KillHighlight") then
+                    player.Character.KillHighlight:Destroy()
                 end
-                
-                -- Restaurar tamaño de la cabeza
-                local head = char:FindFirstChild("Head")
-                if head and OriginalSizes[player.Name] then
-                    head.Size = OriginalSizes[player.Name]
-                    head.Transparency = 0 -- Ocultar la magia de nuevo
-                    head.CanCollide = true
+                local head = player.Character:FindFirstChild("Head")
+                if head then
+                    head.Size = Vector3.new(2, 1, 1) -- Tamaño normal aprox
+                    head.Transparency = 0
                 end
             end
         else
-            -- SELECCIONAR: Activar modo letal
+            -- Seleccionar
             Selected[player.Name] = player
             btn.BackgroundColor3 = Color3.fromRGB(180, 20, 20) 
-            
-            -- Guardar el tamaño original de su cabeza por si lo deseleccionas
-            local char = player.Character
-            if char and char:FindFirstChild("Head") then
-                OriginalSizes[player.Name] = char.Head.Size
-            end
         end
     end)
 end
@@ -102,21 +91,19 @@ Players.PlayerAdded:Connect(createPlayerButton)
 
 Players.PlayerRemoving:Connect(function(plr)
     Selected[plr.Name] = nil 
-    OriginalSizes[plr.Name] = nil
     local button = Frame:FindFirstChild(plr.Name)
     if button then button:Destroy() end
 end)
 
 -- ==========================================
--- 2. MOTOR DE COMBATE, ESP Y HITBOXES
+-- 2. EL MOTOR DEL HACK (HEARTBEAT)
 -- ==========================================
 RunService.Heartbeat:Connect(function()
     local localCharacter = LocalPlayer.Character
     local localTorso = localCharacter and (localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso"))
-    local localHead = localCharacter and localCharacter:FindFirstChild("Head")
     
     if localTorso then
-        -- MODO FANTASMA (Tú eres invisible e intocable)
+        -- Te vuelve un fantasma (invisible, sin colisiones)
         for _, part in ipairs(localCharacter:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Decal") then
                 part.Transparency = 1
@@ -127,14 +114,27 @@ RunService.Heartbeat:Connect(function()
             end
         end
         
-        -- ATAQUE AL OBJETIVO
+        -- Ejecuta las funciones agresivas en los objetivos
         for name, targetPlayer in pairs(Selected) do
             local targetCharacter = targetPlayer.Character
-            local targetTorso = targetCharacter and (targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso"))
-            local targetHead = targetCharacter and targetCharacter:FindFirstChild("Head")
             
-            if targetTorso and targetHead then
-                -- 1. Wallhack (ESP) a través de las paredes
+            if targetCharacter then
+                local targetTorso = targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso")
+                local targetHead = targetCharacter:FindFirstChild("Head")
+                
+                -- 1. Movimiento espectador
+                if targetTorso then
+                    localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 8, 0)
+                end
+                
+                -- 2. HITBOX EXPANDER (Cabeza Gigante)
+                if targetHead then
+                    targetHead.Size = Vector3.new(15, 15, 15) -- Cubo de 15x15x15 studs
+                    targetHead.Transparency = 0.6 -- Semi-transparente para que no te tape toda la visión
+                    targetHead.CanCollide = false -- Para que no choques con su cabeza gigante
+                end
+                
+                -- 3. ESP / Wallhack
                 if not targetCharacter:FindFirstChild("KillHighlight") then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = "KillHighlight"
@@ -142,20 +142,9 @@ RunService.Heartbeat:Connect(function()
                     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
                     highlight.FillTransparency = 0.5
                     highlight.OutlineTransparency = 0.1
-                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop 
                     highlight.Parent = targetCharacter
                 end
-                
-                -- 2. Expansor de Hitbox (Cabeza GIGANTE)
-                -- Multiplicamos su tamaño, ahora es un bloque de 8x8x8 studs
-                targetHead.Size = Vector3.new(8, 8, 8)
-                targetHead.Transparency = 0.6 -- Un poco transparente para que veas el área de impacto
-                targetHead.CanCollide = false -- Para que no se atore con las paredes
-                
-                -- 3. Seguimiento de cámara
-                -- Ya no te teletransportas encima, ahora te quedas libre para disparar, 
-                -- pero tu cámara apunta al centro de esa enorme cabeza.
-                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
             end
         end
     end
