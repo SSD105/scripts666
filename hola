@@ -4,15 +4,31 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
 
-local Selected = {}
+-- Variables tácticas
+local activeTarget = nil
+local originalCFrame = nil -- Guarda tu escondite
 
 -- ==========================================
--- 1. INTERFAZ GRÁFICA (UI)
+-- 1. INTERFAZ GRÁFICA (UI) - AHORA CON BOTÓN DE OCULTAR
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PlayerSelectorGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
+
+-- Botón para ocultar/mostrar el menú
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 100, 0, 30)
+ToggleBtn.Position = UDim2.new(0, 50, 0, 60)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(150, 20, 20)
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Text = "Ocultar Radar"
+ToggleBtn.Parent = ScreenGui
+
+local UICornerToggle = Instance.new("UICorner")
+UICornerToggle.CornerRadius = UDim.new(0, 6)
+UICornerToggle.Parent = ToggleBtn
 
 local Frame = Instance.new("ScrollingFrame")
 Frame.Size = UDim2.new(0, 200, 0, 300)
@@ -39,6 +55,25 @@ UIPadding.PaddingTop = UDim.new(0, 5)
 UIPadding.PaddingBottom = UDim.new(0, 5)
 UIPadding.Parent = Frame
 
+-- Lógica del botón de ocultar
+local isMenuVisible = true
+ToggleBtn.MouseButton1Click:Connect(function()
+    isMenuVisible = not isMenuVisible
+    Frame.Visible = isMenuVisible
+    ToggleBtn.Text = isMenuVisible and "Ocultar Radar" or "Mostrar Radar"
+    ToggleBtn.BackgroundColor3 = isMenuVisible and Color3.fromRGB(150, 20, 20) or Color3.fromRGB(20, 150, 20)
+end)
+
+-- Limpiar el Highlight visual de un jugador
+local function clearHighlight(character)
+    if character and character:FindFirstChild("KillHighlight") then
+        character.KillHighlight:Destroy()
+    end
+end
+
+-- ==========================================
+-- 2. LÓGICA DE BOTONES (OBJETIVO ÚNICO Y RECALL)
+-- ==========================================
 local function createPlayerButton(player)
     if Frame:FindFirstChild(player.Name) then return end 
 
@@ -58,92 +93,117 @@ local function createPlayerButton(player)
     btn.Parent = Frame
 
     btn.MouseButton1Click:Connect(function()
-        if Selected[player.Name] then
-            -- Deseleccionar y restaurar tamaño original
-            Selected[player.Name] = nil
+        local localChar = LocalPlayer.Character
+        local localRoot = localChar and (localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso"))
+
+        if activeTarget == player then
+            -- DESELECCIONAR: Regresar a la normalidad
+            activeTarget = nil
             btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            clearHighlight(player.Character)
             
-            if player.Character then
-                if player.Character:FindFirstChild("KillHighlight") then
-                    player.Character.KillHighlight:Destroy()
-                end
-                local head = player.Character:FindFirstChild("Head")
-                if head then
-                    head.Size = Vector3.new(2, 1, 1) -- Tamaño normal aprox
-                    head.Transparency = 0
-                end
+            -- Sistema de Retorno: Vuelve a donde estabas
+            if originalCFrame and localRoot then
+                localRoot.CFrame = originalCFrame
+                originalCFrame = nil -- Limpiar memoria
             end
         else
-            -- Seleccionar
-            Selected[player.Name] = player
-            btn.BackgroundColor3 = Color3.fromRGB(180, 20, 20) 
+            -- SELECCIONAR NUEVO OBJETIVO
+            -- 1. Limpiar al objetivo anterior si lo había
+            if activeTarget then
+                local oldBtn = Frame:FindFirstChild(activeTarget.Name)
+                if oldBtn then oldBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) end
+                clearHighlight(activeTarget.Character)
+            end
+            
+            -- 2. Guardar tu posición original SI NO estás volando ya
+            if not originalCFrame and localRoot then
+                originalCFrame = localRoot.CFrame
+            end
+
+            -- 3. Fijar el nuevo objetivo
+            activeTarget = player
+            btn.BackgroundColor3 = Color3.fromRGB(180, 20, 20)
         end
     end)
 end
 
 for _, plr in pairs(Players:GetPlayers()) do
-    if plr ~= LocalPlayer then
-        createPlayerButton(plr)
-    end
+    if plr ~= LocalPlayer then createPlayerButton(plr) end
 end
 
 Players.PlayerAdded:Connect(createPlayerButton)
 
 Players.PlayerRemoving:Connect(function(plr)
-    Selected[plr.Name] = nil 
+    if activeTarget == plr then activeTarget = nil end
     local button = Frame:FindFirstChild(plr.Name)
     if button then button:Destroy() end
 end)
 
 -- ==========================================
--- 2. EL MOTOR DEL HACK (HEARTBEAT)
+-- 3. BLOQUEO DE CÁMARA (SMOOTH AIM)
+-- ==========================================
+RunService:BindToRenderStep("CameraLockToHead", Enum.RenderPriority.Camera.Value + 1, function()
+    if activeTarget and activeTarget.Character then
+        local targetHead = activeTarget.Character:FindFirstChild("Head")
+        if targetHead then
+            -- Usamos Lerp (0.3) para que el movimiento sea un seguimiento fluido, no un salto robótico
+            local goalCFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(goalCFrame, 0.3)
+        end
+    end
+end)
+
+-- ==========================================
+-- 4. MOTOR FÍSICO Y ESP (HEARTBEAT)
 -- ==========================================
 RunService.Heartbeat:Connect(function()
     local localCharacter = LocalPlayer.Character
     local localTorso = localCharacter and (localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso"))
     
-    if localTorso then
-        -- Te vuelve un fantasma (invisible, sin colisiones)
-        for _, part in ipairs(localCharacter:GetDescendants()) do
-            if part:IsA("BasePart") or part:IsA("Decal") then
-                part.Transparency = 1
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                    part.Massless = true
+    if activeTarget and localTorso then
+        local targetCharacter = activeTarget.Character
+        local targetTorso = targetCharacter and (targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso"))
+        
+        if targetTorso then
+            -- MODO FANTASMA CONTINUO
+            for _, part in ipairs(localCharacter:GetDescendants()) do
+                if part:IsA("BasePart") or part:IsA("Decal") then
+                    part.Transparency = 1
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                        part.Massless = true
+                    end
                 end
             end
-        end
-        
-        -- Ejecuta las funciones agresivas en los objetivos
-        for name, targetPlayer in pairs(Selected) do
-            local targetCharacter = targetPlayer.Character
             
-            if targetCharacter then
-                local targetTorso = targetCharacter:FindFirstChild("Torso") or targetCharacter:FindFirstChild("UpperTorso")
-                local targetHead = targetCharacter:FindFirstChild("Head")
-                
-                -- 1. Movimiento espectador
-                if targetTorso then
-                    localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 8, 0)
-                end
-                
-                -- 2. HITBOX EXPANDER (Cabeza Gigante)
-                if targetHead then
-                    targetHead.Size = Vector3.new(15, 15, 15) -- Cubo de 15x15x15 studs
-                    targetHead.Transparency = 0.6 -- Semi-transparente para que no te tape toda la visión
-                    targetHead.CanCollide = false -- Para que no choques con su cabeza gigante
-                end
-                
-                -- 3. ESP / Wallhack
-                if not targetCharacter:FindFirstChild("KillHighlight") then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Name = "KillHighlight"
-                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.FillTransparency = 0.5
-                    highlight.OutlineTransparency = 0.1
-                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop 
-                    highlight.Parent = targetCharacter
+            -- MOVIMIENTO PEGADIZO SOBRE EL JUGADOR
+            localTorso.CFrame = targetTorso.CFrame * CFrame.new(0, 8, 0)
+            
+            -- WALLHACK (ESP) A TRAVÉS DE LAS PAREDES
+            if not targetCharacter:FindFirstChild("KillHighlight") then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "KillHighlight"
+                highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                highlight.FillTransparency = 0.5
+                highlight.OutlineTransparency = 0.1
+                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                highlight.Parent = targetCharacter
+            end
+        end
+    else
+        -- Si no hay objetivo, restaurar la visibilidad de tu personaje
+        if localCharacter then
+            for _, part in ipairs(localCharacter:GetDescendants()) do
+                if part:IsA("BasePart") or part:IsA("Decal") then
+                    if part.Name ~= "HumanoidRootPart" then
+                        part.Transparency = 0
+                    end
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                        part.Massless = false
+                    end
                 end
             end
         end
