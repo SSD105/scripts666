@@ -5,10 +5,14 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
 
-local Selected = {}
+-- Variables de Estado (Toggles)
+local TargetPlayer = nil
+local AimbotEnabled = false
+local TeleportEnabled = false
+local WasHovering = false
 
 -- ==========================================
--- 1. INTERFAZ GRÁFICA TÁCTICA
+-- 1. CREACIÓN DEL MENÚ (UI)
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PlayerSelectorGui"
@@ -16,7 +20,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
 local Frame = Instance.new("ScrollingFrame")
-Frame.Size = UDim2.new(0, 200, 0, 300)
+Frame.Size = UDim2.new(0, 200, 0, 350)
 Frame.Position = UDim2.new(0, 50, 0, 100)
 Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 Frame.BorderSizePixel = 0
@@ -34,7 +38,7 @@ UICornerFrame.Parent = Frame
 local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.Padding = UDim.new(0, 5)
 UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-UIListLayout.SortOrder = Enum.SortOrder.Name
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder -- Importante para ordenar botones
 UIListLayout.Parent = Frame
 
 local UIPadding = Instance.new("UIPadding")
@@ -42,48 +46,91 @@ UIPadding.PaddingTop = UDim.new(0, 5)
 UIPadding.PaddingBottom = UDim.new(0, 5)
 UIPadding.Parent = Frame
 
--- Ocultar menú con Control Derecho
+-- Ocultar UI con Control Derecho
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
         Frame.Visible = not Frame.Visible
     end
 end)
 
+-- ==========================================
+-- 2. BOTONES MAESTROS (TOGGLES)
+-- ==========================================
+local btnAimbot = Instance.new("TextButton")
+btnAimbot.Size = UDim2.new(1, -10, 0, 35)
+btnAimbot.Text = "AIMBOT: OFF"
+btnAimbot.Font = Enum.Font.GothamBlack
+btnAimbot.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnAimbot.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+btnAimbot.LayoutOrder = 1
+local corner1 = Instance.new("UICorner") corner1.CornerRadius = UDim.new(0, 6) corner1.Parent = btnAimbot
+btnAimbot.Parent = Frame
+
+btnAimbot.MouseButton1Click:Connect(function()
+    AimbotEnabled = not AimbotEnabled
+    btnAimbot.Text = AimbotEnabled and "AIMBOT: ON" or "AIMBOT: OFF"
+    btnAimbot.BackgroundColor3 = AimbotEnabled and Color3.fromRGB(180, 20, 20) or Color3.fromRGB(45, 45, 45)
+end)
+
+local btnTeleport = Instance.new("TextButton")
+btnTeleport.Size = UDim2.new(1, -10, 0, 35)
+btnTeleport.Text = "TELEPORT: OFF"
+btnTeleport.Font = Enum.Font.GothamBlack
+btnTeleport.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnTeleport.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+btnTeleport.LayoutOrder = 2
+local corner2 = Instance.new("UICorner") corner2.CornerRadius = UDim.new(0, 6) corner2.Parent = btnTeleport
+btnTeleport.Parent = Frame
+
+btnTeleport.MouseButton1Click:Connect(function()
+    TeleportEnabled = not TeleportEnabled
+    btnTeleport.Text = TeleportEnabled and "TELEPORT: ON" or "TELEPORT: OFF"
+    btnTeleport.BackgroundColor3 = TeleportEnabled and Color3.fromRGB(40, 150, 200) or Color3.fromRGB(45, 45, 45)
+end)
+
+-- Separador Visual
+local Separator = Instance.new("Frame")
+Separator.Size = UDim2.new(1, -20, 0, 2)
+Separator.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+Separator.LayoutOrder = 3
+Separator.Parent = Frame
+
+-- ==========================================
+-- 3. LISTA DE JUGADORES
+-- ==========================================
 local function createPlayerButton(player)
     if Frame:FindFirstChild(player.Name) then return end 
 
     local btn = Instance.new("TextButton")
     btn.Name = player.Name
-    btn.Size = UDim2.new(1, -10, 0, 35)
+    btn.Size = UDim2.new(1, -10, 0, 30)
     btn.Text = player.Name
-    btn.Font = Enum.Font.GothamBold
+    btn.Font = Enum.Font.GothamSemibold
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    btn.AutoButtonColor = true
-    
-    local UICornerBtn = Instance.new("UICorner")
-    UICornerBtn.CornerRadius = UDim.new(0, 6)
-    UICornerBtn.Parent = btn
-    
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.LayoutOrder = 4 -- Debajo de los toggles
+    local cornerBtn = Instance.new("UICorner") cornerBtn.CornerRadius = UDim.new(0, 6) cornerBtn.Parent = btn
     btn.Parent = Frame
 
     btn.MouseButton1Click:Connect(function()
-        if Selected[player.Name] then
-            Selected[player.Name] = nil
-            btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-            
-            if player.Character and player.Character:FindFirstChild("KillHighlight") then
-                player.Character.KillHighlight:Destroy()
-            end
+        -- Limpiar highlight del objetivo anterior si existe
+        if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("KillHighlight") then
+            TargetPlayer.Character.KillHighlight:Destroy()
+        end
+
+        if TargetPlayer == player then
+            TargetPlayer = nil
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         else
-            for k, v in pairs(Selected) do
-                Selected[k] = nil
-                local oldBtn = Frame:FindFirstChild(k)
-                if oldBtn then oldBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45) end
+            -- Reiniciar colores de todos los botones de jugadores
+            for _, child in ipairs(Frame:GetChildren()) do
+                if child:IsA("TextButton") and child.LayoutOrder == 4 then
+                    child.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                end
             end
             
-            Selected[player.Name] = player
-            btn.BackgroundColor3 = Color3.fromRGB(180, 20, 20)
+            TargetPlayer = player
+            btn.BackgroundColor3 = Color3.fromRGB(40, 200, 70) 
         end
     end)
 end
@@ -95,79 +142,105 @@ for _, plr in pairs(Players:GetPlayers()) do
 end
 
 Players.PlayerAdded:Connect(createPlayerButton)
-
 Players.PlayerRemoving:Connect(function(plr)
-    Selected[plr.Name] = nil 
+    if TargetPlayer == plr then TargetPlayer = nil end
     local button = Frame:FindFirstChild(plr.Name)
     if button then button:Destroy() end
 end)
 
 -- ==========================================
--- 2. AIMBOT (BLOQUEO DE CÁMARA)
+-- 4. RESTAURAR PERSONAJE (Apagar Ghost Mode)
+-- ==========================================
+local function restoreCharacter()
+    local char = LocalPlayer.Character
+    if char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if part.Name ~= "HumanoidRootPart" then part.Transparency = 0 end
+                part.CanCollide = true
+                part.Massless = false
+            elseif part:IsA("Decal") and part.Name == "face" then
+                part.Transparency = 0
+            end
+        end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if root then root.Anchored = false end
+    end
+end
+
+-- ==========================================
+-- 5. AIMBOT PURO (CÁMARA)
 -- ==========================================
 RunService:BindToRenderStep("LethalAimbot", 201, function()
-    local targetHead = nil
-    for _, targetPlayer in pairs(Selected) do
-        local targetCharacter = targetPlayer.Character
-        if targetCharacter then
-            targetHead = targetCharacter:FindFirstChild("Head")
-            if targetHead then break end
+    if AimbotEnabled and TargetPlayer and TargetPlayer.Character then
+        local targetHead = TargetPlayer.Character:FindFirstChild("Head")
+        if targetHead then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
         end
-    end
-
-    if targetHead then
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
     end
 end)
 
 -- ==========================================
--- 3. MOTOR FÍSICO, ESP Y SINCRONIZACIÓN DE CÁMARA
+-- 6. MOTOR DE TELETRANSPORTE Y FÍSICAS
 -- ==========================================
 RunService.Heartbeat:Connect(function()
     local localCharacter = LocalPlayer.Character
     local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
     
     if localRoot then
-        local isAttached = false
+        local targetCharacter = TargetPlayer and TargetPlayer.Character
+        local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
+        local targetHead = targetCharacter and targetCharacter:FindFirstChild("Head")
         
-        -- Modo fantasma extremo
-        for _, part in ipairs(localCharacter:GetDescendants()) do
-            if part:IsA("BasePart") or part:IsA("Decal") then
-                part.Transparency = 1
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                    part.Massless = true
-                end
-            end
-        end
-        
-        for name, targetPlayer in pairs(Selected) do
-            local targetCharacter = targetPlayer.Character
-            -- Ahora buscamos su CABEZA, no su torso.
-            local targetHead = targetCharacter and targetCharacter:FindFirstChild("Head")
+        -- Si TELEPORT está encendido y hay objetivo
+        if TeleportEnabled and targetRoot then
+            WasHovering = true
+            localRoot.Anchored = true
             
-            if targetHead then
-                isAttached = true
+            -- Volverse fantasma
+            for _, part in ipairs(localCharacter:GetDescendants()) do
+                if part:IsA("BasePart") or part:IsA("Decal") then
+                    part.Transparency = 1
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                        part.Massless = true
+                    end
+                end
+            end
+            
+            -- Aplicar ESP al objetivo
+            if not targetCharacter:FindFirstChild("KillHighlight") then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "KillHighlight"
+                highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                highlight.FillTransparency = 0.5
+                highlight.OutlineTransparency = 0.1
+                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                highlight.Parent = targetCharacter
+            end
+            
+            -- Calcular posición
+            local hoverPosition = (targetRoot.CFrame * CFrame.new(0, 8, 3)).Position
+            
+            -- Si el Aimbot también está encendido, el cuerpo apunta a la cabeza
+            if AimbotEnabled and targetHead then
+                localRoot.CFrame = CFrame.lookAt(hoverPosition, targetHead.Position)
+            else
+                localRoot.CFrame = CFrame.new(hoverPosition)
+            end
+            
+        else
+            -- Si apagamos el TELEPORT, devolvemos el personaje a la normalidad
+            if WasHovering then
+                restoreCharacter()
+                WasHovering = false
                 
-                -- MAGIA AQUÍ: Multiplicamos el CFrame de su Cabeza (que incluye su rotación exacta de cámara).
-                -- Estarás 2.5 studs arriba y 2 studs atrás de su cabeza, copiando su ángulo al 100%.
-                localRoot.CFrame = targetHead.CFrame * CFrame.new(0, 15, 2)
-                
-                -- Wallhack
-                if not targetCharacter:FindFirstChild("KillHighlight") then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Name = "KillHighlight"
-                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.FillTransparency = 0.5
-                    highlight.OutlineTransparency = 0.1
-                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                    highlight.Parent = targetCharacter
+                -- Limpiar ESP si apagaste el teleport
+                if targetCharacter and targetCharacter:FindFirstChild("KillHighlight") then
+                    targetCharacter.KillHighlight:Destroy()
                 end
             end
         end
-        
-        -- Anclaje para eliminar la gravedad y evitar vibraciones en tu Aimbot
-        localRoot.Anchored = isAttached
     end
 end)
